@@ -1,0 +1,16 @@
+[package]
+name = "wine-pipeline"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "wine-pipeline"
+path = "src/main.rs"
+
+[dependencies]
+polars = { version = "0.46", features = ["lazy", "csv", "parquet", "json", "strings"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+clap = { version = "4", features = ["derive", "env"] }
+serde_json = "1"
+chrono = "0.4"
+anyhow = "1"

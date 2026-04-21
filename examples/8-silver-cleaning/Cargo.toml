@@ -1,0 +1,10 @@
+[package]
+name = "silver-cleaning"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+polars = { version = "0.46", features = ["lazy", "csv", "strings"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+clap = { version = "4", features = ["derive", "env"] }
+anyhow = "1"

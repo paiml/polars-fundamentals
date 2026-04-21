@@ -1,0 +1,14 @@
+[workspace]
+members = [
+    "examples/1-polars-intro",
+    "examples/2-dataframes-series",
+    "examples/3-lazy-api",
+    "examples/4-data-cleaning",
+    "examples/5-filtering-aggregation",
+    "examples/6-joins-reshape",
+    "examples/7-bronze-ingestion",
+    "examples/8-silver-cleaning",
+    "examples/9-gold-export",
+    "wine-pipeline",
+]
+resolver = "2"

@@ -1,0 +1,6 @@
+/target
+*.db
+*.sqlite
+*.parquet
+gold_wines.csv
+gold_wines.json
