@@ -16,8 +16,9 @@ Elk Cove,Pinot Noir,Oregon,89,"Red berry, silky"
 Cloudy Bay,Sauvignon Blanc,Marlborough,90,"Citrus, herbaceous"
 "#;
 
-    let df = CsvReader::new(std::io::Cursor::new(csv))
-        .has_header(true)
+    let df = CsvReadOptions::default()
+        .with_has_header(true)
+        .into_reader_with_file_handle(std::io::Cursor::new(csv))
         .finish()?;
 
     // --- Schema inspection ---

@@ -7,7 +7,7 @@ use anyhow::Result;
 use chrono::Utc;
 use clap::Parser;
 use polars::prelude::*;
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -40,12 +40,12 @@ fn init_schema(conn: &Connection) -> Result<()> {
 fn ingest(conn: &Connection, df: &DataFrame) -> Result<usize> {
     let ingested_at = Utc::now().to_rfc3339();
 
-    let names   = df.column("name")?.str()?;
+    let names = df.column("name")?.str()?;
     let variety = df.column("variety")?.str()?;
-    let region  = df.column("region")?.str()?;
+    let region = df.column("region")?.str()?;
     let rating_series = df.column("rating")?.cast(&DataType::String)?;
-    let rating  = rating_series.str()?;
-    let notes   = df.column("notes")?.str()?;
+    let rating = rating_series.str()?;
+    let notes = df.column("notes")?.str()?;
 
     let tx = conn.unchecked_transaction()?;
     for i in 0..df.height() {
@@ -69,7 +69,9 @@ fn ingest(conn: &Connection, df: &DataFrame) -> Result<usize> {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let df = CsvReader::from_path(&cli.input)?.finish()?;
+    let df = CsvReadOptions::default()
+        .try_into_reader_with_file_path(Some((&cli.input).into()))?
+        .finish()?;
     println!("Read {} rows from {}", df.height(), cli.input.display());
 
     let conn = Connection::open(&cli.db)?;

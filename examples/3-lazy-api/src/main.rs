@@ -15,8 +15,9 @@ Domaine Weinbach,Riesling,Alsace,93
 "#;
 
     // Convert the eager DataFrame to a LazyFrame — no work happens yet.
-    let lf = CsvReader::new(std::io::Cursor::new(csv))
-        .has_header(true)
+    let lf = CsvReadOptions::default()
+        .with_has_header(true)
+        .into_reader_with_file_handle(std::io::Cursor::new(csv))
         .finish()?
         .lazy();
 
@@ -25,16 +26,25 @@ Domaine Weinbach,Riesling,Alsace,93
     let result = lf
         .filter(col("rating").gt(lit(90i32)))
         .with_column((col("rating") - lit(88i32)).alias("points_above_88"))
-        .select([col("name"), col("variety"), col("rating"), col("points_above_88")])
-        .sort(["rating"], SortMultipleOptions::default().with_order_descending(true))
+        .select([
+            col("name"),
+            col("variety"),
+            col("rating"),
+            col("points_above_88"),
+        ])
+        .sort(
+            ["rating"],
+            SortMultipleOptions::default().with_order_descending(true),
+        )
         .collect()?;
 
     println!("=== Wines rated above 90 ===");
     println!("{}", result);
 
     // --- Inspect the query plan before collecting ---
-    let lf2 = CsvReader::new(std::io::Cursor::new(csv))
-        .has_header(true)
+    let lf2 = CsvReadOptions::default()
+        .with_has_header(true)
+        .into_reader_with_file_handle(std::io::Cursor::new(csv))
         .finish()?
         .lazy()
         .filter(col("region").eq(lit("Mendoza")))

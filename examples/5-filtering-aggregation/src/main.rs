@@ -18,8 +18,9 @@ Kim Crawford,Sauvignon Blanc,Marlborough,87
 Domaine Weinbach,Riesling,Alsace,93
 "#;
 
-    let lf = CsvReader::new(std::io::Cursor::new(csv))
-        .has_header(true)
+    let lf = CsvReadOptions::default()
+        .with_has_header(true)
+        .into_reader_with_file_handle(std::io::Cursor::new(csv))
         .finish()?
         .lazy();
 
@@ -43,8 +44,8 @@ Domaine Weinbach,Riesling,Alsace,93
         .sort(
             ["rating", "name"],
             SortMultipleOptions::new()
-                .with_order_descending(true)   // applies to "rating"
-                .with_order_descending(false),  // applies to "name"
+                .with_order_descending(true) // applies to "rating"
+                .with_order_descending(false), // applies to "name"
         )
         .collect()?;
     println!("{}\n", sorted);
@@ -55,8 +56,14 @@ Domaine Weinbach,Riesling,Alsace,93
         .clone()
         .with_column(col("rating").cast(DataType::Float64))
         .group_by([col("variety")])
-        .agg([col("rating").mean().alias("avg_rating"), col("rating").count().alias("count")])
-        .sort(["avg_rating"], SortMultipleOptions::default().with_order_descending(true))
+        .agg([
+            col("rating").mean().alias("avg_rating"),
+            col("rating").count().alias("count"),
+        ])
+        .sort(
+            ["avg_rating"],
+            SortMultipleOptions::default().with_order_descending(true),
+        )
         .collect()?;
     println!("{}\n", avg_by_variety);
 
@@ -67,7 +74,10 @@ Domaine Weinbach,Riesling,Alsace,93
         .clone()
         .group_by([col("region")])
         .agg([col("region").count().alias("count")])
-        .sort(["count"], SortMultipleOptions::default().with_order_descending(true))
+        .sort(
+            ["count"],
+            SortMultipleOptions::default().with_order_descending(true),
+        )
         .collect()?;
     println!("{}", region_counts);
 

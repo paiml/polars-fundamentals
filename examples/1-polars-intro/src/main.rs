@@ -8,9 +8,9 @@ fn main() -> PolarsResult<()> {
     // Build a tiny DataFrame from Rust vecs — no file needed to get started.
     // Each Series maps to one column; Polars stores them contiguously in Arrow arrays.
     let df = DataFrame::new(vec![
-        Series::new("wine".into(), &["Malbec", "Chardonnay", "Pinot Noir"]),
-        Series::new("rating".into(), &[92.0_f64, 88.0, 95.0]),
-        Series::new("region".into(), &["Mendoza", "Burgundy", "Oregon"]),
+        Column::new("wine".into(), &["Malbec", "Chardonnay", "Pinot Noir"]),
+        Column::new("rating".into(), &[92.0_f64, 88.0, 95.0]),
+        Column::new("region".into(), &["Mendoza", "Burgundy", "Oregon"]),
     ])?;
 
     println!("DataFrame shape: {:?}", df.shape()); // (rows, cols)
