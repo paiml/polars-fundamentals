@@ -2,7 +2,7 @@
 
 Extend your `wine-pipeline` from Module 3 with a `serve` subcommand that answers
 HTTP requests from the gold layer. The reference implementation is
-[`wine-pipeline/src/serve.rs`](../../wine-pipeline/src/serve.rs). Build your own
+[`wine-pipeline/src/serve.rs`](https://github.com/paiml/polars-fundamentals/blob/main/wine-pipeline/src/serve.rs). Build your own
 version before you read it.
 
 ## Requirements
