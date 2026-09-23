@@ -5,10 +5,13 @@
 //   bronze  — read wine-ratings.csv and load raw rows into SQLite raw_wines
 //   silver  — clean raw_wines and write a validated clean_wines table
 //   gold    — filter by --min-rating, aggregate, and export CSV + JSON
+//   serve   — answer HTTP requests from the gold LazyFrame (Module 4)
 
 mod pipeline;
+mod serve;
 
 use clap::{Parser, Subcommand};
+use polars::prelude::ChunkAgg;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -52,6 +55,20 @@ enum Commands {
         #[arg(long, default_value_t = 90.0)]
         min_rating: f64,
     },
+    /// Serve the gold layer over HTTP (Module 4)
+    Serve {
+        /// Minimum rating that defines the gold layer (inclusive)
+        #[arg(long, default_value_t = 90.0)]
+        min_rating: f64,
+
+        /// Address to bind
+        #[arg(long, default_value = "127.0.0.1")]
+        bind: std::net::IpAddr,
+
+        /// Port to listen on
+        #[arg(long, default_value_t = 3000)]
+        port: u16,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -66,7 +83,10 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::Silver => {
             let (total, kept) = pipeline::silver(&conn)?;
-            println!("Silver: {kept} clean rows written ({} dropped)", total - kept);
+            println!(
+                "Silver: {kept} clean rows written ({} dropped)",
+                total - kept
+            );
         }
         Commands::Gold { min_rating, region } => {
             let (csv, json) = pipeline::gold(&conn, min_rating, region.as_deref())?;
@@ -74,6 +94,29 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::Report { min_rating } => {
             pipeline::report(&conn, min_rating)?;
+        }
+        Commands::Serve {
+            min_rating,
+            bind,
+            port,
+        } => {
+            let gold = pipeline::gold_lazy(&conn, min_rating)?.collect()?;
+            if gold.height() == 0 {
+                anyhow::bail!(
+                    "gold layer is empty at --min-rating {min_rating}; run bronze and silver first"
+                );
+            }
+            // Provable contract: gold floor -- every wine the API can return is
+            // rated at or above the threshold that defined the gold layer.
+            let lowest = gold.column("rating")?.f64()?.min().unwrap_or(f64::NAN);
+            assert!(
+                lowest >= min_rating,
+                "gold floor violated: {lowest} < {min_rating}"
+            );
+            println!("contract: gold floor (min rating {lowest} >= {min_rating}) OK");
+
+            let addr = std::net::SocketAddr::new(bind, port);
+            tokio::runtime::Runtime::new()?.block_on(serve::run(gold, addr))?;
         }
     }
 
