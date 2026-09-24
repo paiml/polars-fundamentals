@@ -1,0 +1,29 @@
+# The `gate` check the paiml org ruleset requires on main.
+#
+# Every example and the wine-pipeline must build, pass clippy, and pass their
+# tests, including the `serve` route tests Module 4's graded project grades
+# against. Runs on the intel clean-room fleet: this org uses no hosted runners.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  gate:
+    name: gate
+    timeout-minutes: 60
+    runs-on: [self-hosted, clean-room, X64, intel]
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+    steps:
+      - uses: actions/checkout@v6
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --workspace
