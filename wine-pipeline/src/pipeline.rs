@@ -36,15 +36,17 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
 // ---------------------------------------------------------------------------
 
 pub fn bronze(conn: &Connection, csv_path: &Path) -> Result<usize> {
-    let df = CsvReader::from_path(csv_path)?.finish()?;
+    let df = CsvReadOptions::default()
+        .try_into_reader_with_file_path(Some((csv_path).into()))?
+        .finish()?;
     let ingested_at = Utc::now().to_rfc3339();
 
-    let names   = df.column("name")?.str()?;
+    let names = df.column("name")?.str()?;
     let variety = df.column("variety")?.str()?;
-    let region  = df.column("region")?.str()?;
-    let rating  = df.column("rating")?.cast(&DataType::String)?;
-    let rating  = rating.str()?;
-    let notes   = df.column("notes")?.str()?;
+    let region = df.column("region")?.str()?;
+    let rating = df.column("rating")?.cast(&DataType::String)?;
+    let rating = rating.str()?;
+    let notes = df.column("notes")?.str()?;
 
     conn.execute("DELETE FROM raw_wines;", [])?;
     let tx = conn.unchecked_transaction()?;
@@ -71,15 +73,13 @@ pub fn bronze(conn: &Connection, csv_path: &Path) -> Result<usize> {
 // ---------------------------------------------------------------------------
 
 fn load_raw(conn: &Connection) -> Result<DataFrame> {
-    let mut stmt = conn.prepare(
-        "SELECT name, variety, region, rating, notes FROM raw_wines",
-    )?;
+    let mut stmt = conn.prepare("SELECT name, variety, region, rating, notes FROM raw_wines")?;
 
-    let mut names:   Vec<Option<String>> = vec![];
+    let mut names: Vec<Option<String>> = vec![];
     let mut variety: Vec<Option<String>> = vec![];
     let mut regions: Vec<Option<String>> = vec![];
     let mut ratings: Vec<Option<String>> = vec![];
-    let mut notes:   Vec<Option<String>> = vec![];
+    let mut notes: Vec<Option<String>> = vec![];
 
     for row in stmt.query_map([], |row| {
         Ok((
@@ -99,11 +99,11 @@ fn load_raw(conn: &Connection) -> Result<DataFrame> {
     }
 
     Ok(DataFrame::new(vec![
-        Series::new("name".into(),    names),
-        Series::new("variety".into(), variety),
-        Series::new("region".into(),  regions),
-        Series::new("rating".into(),  ratings),
-        Series::new("notes".into(),   notes),
+        Column::new("name".into(), names),
+        Column::new("variety".into(), variety),
+        Column::new("region".into(), regions),
+        Column::new("rating".into(), ratings),
+        Column::new("notes".into(), notes),
     ])?)
 }
 
@@ -115,8 +115,18 @@ pub fn silver(conn: &Connection) -> Result<(usize, usize)> {
         .lazy()
         .drop_nulls(Some(vec![col("name"), col("rating")]))
         .with_column(col("rating").cast(DataType::Float64))
-        .filter(col("rating").gt_eq(lit(80.0_f64)).and(col("rating").lt_eq(lit(100.0_f64))))
-        .with_column(col("variety").str().strip_chars(lit(" ")).str().to_uppercase())
+        .filter(
+            col("rating")
+                .gt_eq(lit(80.0_f64))
+                .and(col("rating").lt_eq(lit(100.0_f64))),
+        )
+        .with_column(
+            col("variety")
+                .str()
+                .strip_chars(lit(" "))
+                .str()
+                .to_uppercase(),
+        )
         .with_column(col("notes").fill_null(lit("")))
         .unique(None, UniqueKeepStrategy::First)
         .collect()?;
@@ -124,11 +134,11 @@ pub fn silver(conn: &Connection) -> Result<(usize, usize)> {
     let clean_count = clean.height();
 
     conn.execute("DELETE FROM clean_wines;", [])?;
-    let names   = clean.column("name")?.str()?;
+    let names = clean.column("name")?.str()?;
     let variety = clean.column("variety")?.str()?;
-    let region  = clean.column("region")?.str()?;
-    let rating  = clean.column("rating")?.f64()?;
-    let notes   = clean.column("notes")?.str()?;
+    let region = clean.column("region")?.str()?;
+    let rating = clean.column("rating")?.f64()?;
+    let notes = clean.column("notes")?.str()?;
 
     let tx = conn.unchecked_transaction()?;
     for i in 0..clean_count {
@@ -153,14 +163,13 @@ pub fn silver(conn: &Connection) -> Result<(usize, usize)> {
 // ---------------------------------------------------------------------------
 
 fn load_clean(conn: &Connection) -> Result<DataFrame> {
-    let mut stmt = conn.prepare(
-        "SELECT name, variety, region, rating FROM clean_wines",
-    )?;
+    let mut stmt = conn.prepare("SELECT name, variety, region, rating, notes FROM clean_wines")?;
 
-    let mut names:   Vec<String>         = vec![];
-    let mut variety: Vec<String>         = vec![];
+    let mut names: Vec<String> = vec![];
+    let mut variety: Vec<String> = vec![];
     let mut regions: Vec<Option<String>> = vec![];
-    let mut ratings: Vec<f64>            = vec![];
+    let mut ratings: Vec<f64> = vec![];
+    let mut notes: Vec<String> = vec![];
 
     for row in stmt.query_map([], |row| {
         Ok((
@@ -168,29 +177,45 @@ fn load_clean(conn: &Connection) -> Result<DataFrame> {
             row.get::<_, String>(1)?,
             row.get::<_, Option<String>>(2)?,
             row.get::<_, f64>(3)?,
+            row.get::<_, String>(4)?,
         ))
     })? {
-        let (n, v, r, rt) = row?;
+        let (n, v, r, rt, nt) = row?;
         names.push(n);
         variety.push(v);
         regions.push(r);
         ratings.push(rt);
+        notes.push(nt);
     }
 
     Ok(DataFrame::new(vec![
-        Series::new("name".into(),    names),
-        Series::new("variety".into(), variety),
-        Series::new("region".into(),  regions),
-        Series::new("rating".into(),  ratings),
+        Column::new("name".into(), names),
+        Column::new("variety".into(), variety),
+        Column::new("region".into(), regions),
+        Column::new("rating".into(), ratings),
+        Column::new("notes".into(), notes),
     ])?)
 }
 
-pub fn gold(conn: &Connection, min_rating: f64, region: Option<&str>) -> Result<(&'static str, &'static str)> {
-    let df = load_clean(conn)?;
-
-    let mut lf = df
+/// The gold layer as a LazyFrame: every clean wine rated at or above
+/// `min_rating`. `gold` exports it; `serve` answers HTTP requests from it.
+pub fn gold_lazy(conn: &Connection, min_rating: f64) -> Result<LazyFrame> {
+    Ok(load_clean(conn)?
         .lazy()
-        .filter(col("rating").gt_eq(lit(min_rating)));
+        .filter(col("rating").gt_eq(lit(min_rating))))
+}
+
+pub fn gold(
+    conn: &Connection,
+    min_rating: f64,
+    region: Option<&str>,
+) -> Result<(&'static str, &'static str)> {
+    let mut lf = gold_lazy(conn, min_rating)?.select([
+        col("name"),
+        col("variety"),
+        col("region"),
+        col("rating"),
+    ]);
 
     if let Some(r) = region {
         lf = lf.filter(col("region").eq(lit(r)));
@@ -225,7 +250,10 @@ pub fn report(conn: &Connection, min_rating: f64) -> Result<()> {
             col("rating").mean().alias("avg_rating"),
             col("rating").count().alias("count"),
         ])
-        .sort(["avg_rating"], SortMultipleOptions::default().with_order_descending(true))
+        .sort(
+            ["avg_rating"],
+            SortMultipleOptions::default().with_order_descending(true),
+        )
         .limit(10)
         .collect()?;
 
@@ -234,8 +262,8 @@ pub fn report(conn: &Connection, min_rating: f64) -> Result<()> {
     println!("|---------|-----------|-------|");
 
     let variety = top.column("variety")?.str()?;
-    let avg     = top.column("avg_rating")?.f64()?;
-    let count   = top.column("count")?.u32()?;
+    let avg = top.column("avg_rating")?.f64()?;
+    let count = top.column("count")?.u32()?;
 
     for i in 0..top.height() {
         println!(

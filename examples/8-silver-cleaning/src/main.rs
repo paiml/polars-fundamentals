@@ -6,11 +6,14 @@
 use anyhow::Result;
 use clap::Parser;
 use polars::prelude::*;
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(name = "silver", about = "Clean bronze data and write the silver layer")]
+#[command(
+    name = "silver",
+    about = "Clean bronze data and write the silver layer"
+)]
 struct Cli {
     /// Path to the SQLite database file
     #[arg(long, env = "WINE_DB", default_value = "wine.db")]
@@ -18,15 +21,13 @@ struct Cli {
 }
 
 fn load_raw(conn: &Connection) -> Result<DataFrame> {
-    let mut stmt = conn.prepare(
-        "SELECT name, variety, region, rating, notes FROM raw_wines",
-    )?;
+    let mut stmt = conn.prepare("SELECT name, variety, region, rating, notes FROM raw_wines")?;
 
-    let mut names: Vec<Option<String>>   = vec![];
+    let mut names: Vec<Option<String>> = vec![];
     let mut variety: Vec<Option<String>> = vec![];
     let mut regions: Vec<Option<String>> = vec![];
     let mut ratings: Vec<Option<String>> = vec![];
-    let mut notes: Vec<Option<String>>   = vec![];
+    let mut notes: Vec<Option<String>> = vec![];
 
     let rows = stmt.query_map([], |row| {
         Ok((
@@ -48,11 +49,11 @@ fn load_raw(conn: &Connection) -> Result<DataFrame> {
     }
 
     Ok(DataFrame::new(vec![
-        Series::new("name".into(),    names),
-        Series::new("variety".into(), variety),
-        Series::new("region".into(),  regions),
-        Series::new("rating".into(),  ratings),
-        Series::new("notes".into(),   notes),
+        Column::new("name".into(), names),
+        Column::new("variety".into(), variety),
+        Column::new("region".into(), regions),
+        Column::new("rating".into(), ratings),
+        Column::new("notes".into(), notes),
     ])?)
 }
 
@@ -60,8 +61,18 @@ fn clean(df: DataFrame) -> PolarsResult<DataFrame> {
     df.lazy()
         .drop_nulls(Some(vec![col("name"), col("rating")]))
         .with_column(col("rating").cast(DataType::Float64))
-        .filter(col("rating").gt_eq(lit(80.0_f64)).and(col("rating").lt_eq(lit(100.0_f64))))
-        .with_column(col("variety").str().strip_chars(lit(" ")).str().to_uppercase())
+        .filter(
+            col("rating")
+                .gt_eq(lit(80.0_f64))
+                .and(col("rating").lt_eq(lit(100.0_f64))),
+        )
+        .with_column(
+            col("variety")
+                .str()
+                .strip_chars(lit(" "))
+                .str()
+                .to_uppercase(),
+        )
         .with_column(col("notes").fill_null(lit("")))
         .unique(None, UniqueKeepStrategy::First)
         .collect()
@@ -80,11 +91,11 @@ fn write_silver(conn: &Connection, df: &DataFrame) -> Result<()> {
          );",
     )?;
 
-    let names   = df.column("name")?.str()?;
+    let names = df.column("name")?.str()?;
     let variety = df.column("variety")?.str()?;
-    let region  = df.column("region")?.str()?;
-    let rating  = df.column("rating")?.f64()?;
-    let notes   = df.column("notes")?.str()?;
+    let region = df.column("region")?.str()?;
+    let rating = df.column("rating")?.f64()?;
+    let notes = df.column("notes")?.str()?;
 
     let tx = conn.unchecked_transaction()?;
     for i in 0..df.height() {
@@ -118,8 +129,11 @@ fn main() -> Result<()> {
     write_silver(&conn, &clean)?;
 
     println!("Wrote {clean_count} rows to clean_wines");
-    println!("Summary: {} rows dropped, {} nulls in rating handled",
-        raw_count - clean_count, raw_count - clean_count);
+    println!(
+        "Summary: {} rows dropped, {} nulls in rating handled",
+        raw_count - clean_count,
+        raw_count - clean_count
+    );
 
     Ok(())
 }

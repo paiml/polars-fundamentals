@@ -15,8 +15,9 @@ Cloudy Bay,Sauvignon Blanc,Marlborough,90,Citrus
 ,Riesling,Alsace,93,Honey
 "#;
 
-    let df = CsvReader::new(std::io::Cursor::new(csv))
-        .has_header(true)
+    let df = CsvReadOptions::default()
+        .with_has_header(true)
+        .into_reader_with_file_handle(std::io::Cursor::new(csv))
         .finish()?;
 
     println!("=== Raw data ===");
@@ -36,7 +37,11 @@ Cloudy Bay,Sauvignon Blanc,Marlborough,90,Citrus
         // Cast rating to f64 for numeric operations.
         .with_column(col("rating").cast(DataType::Float64))
         // Filter out-of-range ratings (valid: 80–100).
-        .filter(col("rating").gt_eq(lit(80.0_f64)).and(col("rating").lt_eq(lit(100.0_f64))))
+        .filter(
+            col("rating")
+                .gt_eq(lit(80.0_f64))
+                .and(col("rating").lt_eq(lit(100.0_f64))),
+        )
         // Normalize variety: trim whitespace, then uppercase.
         .with_column(
             col("variety")

@@ -4,3 +4,5 @@
 *.parquet
 gold_wines.csv
 gold_wines.json
+wine-ratings.csv
+enriched_wines.csv

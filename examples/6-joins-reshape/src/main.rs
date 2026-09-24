@@ -23,12 +23,14 @@ Chardonnay,White
 Riesling,White
 "#;
 
-    let wines = CsvReader::new(std::io::Cursor::new(wine_csv))
-        .has_header(true)
+    let wines = CsvReadOptions::default()
+        .with_has_header(true)
+        .into_reader_with_file_handle(std::io::Cursor::new(wine_csv))
         .finish()?;
 
-    let families = CsvReader::new(std::io::Cursor::new(family_csv))
-        .has_header(true)
+    let families = CsvReadOptions::default()
+        .with_has_header(true)
+        .into_reader_with_file_handle(std::io::Cursor::new(family_csv))
         .finish()?;
 
     // --- Left join: enrich wines with wine family ---
@@ -48,7 +50,8 @@ Riesling,White
     // unpivot keeps 'name' and 'family' as identifier columns and turns
     // 'rating' into a value row — useful for reporting tools that expect long format.
     println!("=== Wide-to-long with melt ===");
-    let mut enriched_f64 = enriched
+    let enriched_f64 = enriched
+        .clone()
         .lazy()
         .with_column(col("rating").cast(DataType::Float64))
         .collect()?;
@@ -58,8 +61,7 @@ Riesling,White
     // --- Write cleaned DataFrame to CSV ---
     println!("=== CSV export ===");
     let mut csv_file = std::fs::File::create("enriched_wines.csv")?;
-    CsvWriter::new(&mut csv_file)
-        .finish(&mut enriched.clone())?;
+    CsvWriter::new(&mut csv_file).finish(&mut enriched.clone())?;
     println!("Wrote enriched_wines.csv");
 
     // --- Write to Parquet (in-memory bytes to show the API) ---

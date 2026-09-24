@@ -8,9 +8,16 @@ name = "wine-pipeline"
 path = "src/main.rs"
 
 [dependencies]
-polars = { version = "0.46", features = ["lazy", "csv", "parquet", "json", "strings"] }
+polars = { version = "0.46", features = ["lazy", "csv", "parquet", "json", "strings", "regex"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
 clap = { version = "4", features = ["derive", "env"] }
 serde_json = "1"
 chrono = "0.4"
 anyhow = "1"
+axum = "0.7"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

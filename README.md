@@ -16,15 +16,19 @@ Complete these hands-on labs to reinforce your learning:
 
 | Lab | Topic | Example |
 |-----|-------|---------|
-| [Lab 1: What is Polars and Why Use It with Rust?](./labs/lab-1.md) | Arrow memory model, Polars vs. pandas, project setup | [examples/1-polars-intro](./examples/1-polars-intro/) |
-| [Lab 2: DataFrames and Series](./labs/lab-2.md) | CsvReader, schema inspection, null counts, slicing | [examples/2-dataframes-series](./examples/2-dataframes-series/) |
-| [Lab 3: Expressions and the Lazy API](./labs/lab-3.md) | col, lit, LazyFrame, query plans, collect | [examples/3-lazy-api](./examples/3-lazy-api/) |
-| [Lab 4: Data Cleaning](./labs/lab-4.md) | Nulls, casting, text normalization, invalid rows | [examples/4-data-cleaning](./examples/4-data-cleaning/) |
-| [Lab 5: Sorting, Filtering, and Aggregation](./labs/lab-5.md) | filter, sort, group_by, aggregations | [examples/5-filtering-aggregation](./examples/5-filtering-aggregation/) |
-| [Lab 6: Joining and Reshaping Data](./labs/lab-6.md) | Left joins, melt/unpivot, CSV and Parquet export | [examples/6-joins-reshape](./examples/6-joins-reshape/) |
-| [Lab 7: Bronze — Ingesting Raw Data](./labs/lab-7.md) | clap CLI, CsvReader to SQLite, ingested_at timestamp | [examples/7-bronze-ingestion](./examples/7-bronze-ingestion/) |
-| [Lab 8: Silver — Cleaning and Standardizing](./labs/lab-8.md) | SQLite to LazyFrame, cleaning pipeline, clean_wines | [examples/8-silver-cleaning](./examples/8-silver-cleaning/) |
-| [Lab 9: Gold — Business Logic and Export](./labs/lab-9.md) | min-rating filter, top varieties, CSV and JSON export | [examples/9-gold-export](./examples/9-gold-export/) |
+| Lab 1: What is Polars and Why Use It with Rust? | Arrow memory model, Polars vs. pandas, project setup | [examples/1-polars-intro](./examples/1-polars-intro/) |
+| Lab 2: DataFrames and Series | CsvReader, schema inspection, null counts, slicing | [examples/2-dataframes-series](./examples/2-dataframes-series/) |
+| Lab 3: Expressions and the Lazy API | col, lit, LazyFrame, query plans, collect | [examples/3-lazy-api](./examples/3-lazy-api/) |
+| Lab 4: Data Cleaning | Nulls, casting, text normalization, invalid rows | [examples/4-data-cleaning](./examples/4-data-cleaning/) |
+| Lab 5: Sorting, Filtering, and Aggregation | filter, sort, group_by, aggregations | [examples/5-filtering-aggregation](./examples/5-filtering-aggregation/) |
+| Lab 6: Joining and Reshaping Data | Left joins, melt/unpivot, CSV and Parquet export | [examples/6-joins-reshape](./examples/6-joins-reshape/) |
+| Lab 7: Bronze — Ingesting Raw Data | clap CLI, CsvReader to SQLite, ingested_at timestamp | [examples/7-bronze-ingestion](./examples/7-bronze-ingestion/) |
+| Lab 8: Silver — Cleaning and Standardizing | SQLite to LazyFrame, cleaning pipeline, clean_wines | [examples/8-silver-cleaning](./examples/8-silver-cleaning/) |
+| Lab 9: Gold — Business Logic and Export | min-rating filter, top varieties, CSV and JSON export | [examples/9-gold-export](./examples/9-gold-export/) |
+| [Lab 10: Serve the Gold Layer](./labs/lab-10.md) | Axum server over the gold LazyFrame, startup contract | [wine-pipeline](./wine-pipeline/) |
+| [Lab 11: Filter Wines over HTTP](./labs/lab-11.md) | GET /wines, filter()/col() from query parameters | [wine-pipeline](./wine-pipeline/) |
+| [Lab 12: Aggregations as Endpoints](./labs/lab-12.md) | GET /regions, GET /varieties with group_by | [wine-pipeline](./wine-pipeline/) |
+| [Lab 13: Search and Region Routes](./labs/lab-13.md) | /wines/search, /wines/region/{region} | [wine-pipeline](./wine-pipeline/) |
 
 ## Course Outline
 
@@ -79,6 +83,22 @@ Complete these hands-on labs to reinforce your learning:
 - Configurable thresholds with clap flags
 - Exporting the gold DataFrame for downstream consumers
 
+### Module 4: Serving the Gold Layer
+
+#### Lesson 4.1 — [An Axum server over the gold layer](./docs/module-4/4.1-an-axum-server-over-the-gold-layer.md)
+- Reusing the gold LazyFrame from Module 3 instead of re-implementing it
+- A startup contract: the gold floor, and refusing to serve an empty layer
+
+#### Lesson 4.2 — [GET /wines: query parameters as Polars expressions](./docs/module-4/4.2-get-wines-filters-as-expressions.md)
+- region / variety / min_rating / max_rating mapped onto filter() and col()
+- Why a parameter must reach Polars through lit(), never through a string of code
+
+#### Lesson 4.3 — [GET /regions and GET /varieties](./docs/module-4/4.3-regions-and-varieties-with-group-by.md)
+- group_by as an endpoint, with stable output order
+
+#### Lesson 4.4 — [/wines/search and /wines/region/{region}](./docs/module-4/4.4-search-and-region-routes.md)
+- Substring search versus exact path matching
+
 ## Graded Project: wine-pipeline
 
 Build **wine-pipeline** — a Rust CLI tool implementing the Bronze–Silver–Gold medallion architecture over the wine ratings dataset:
@@ -87,12 +107,16 @@ Build **wine-pipeline** — a Rust CLI tool implementing the Bronze–Silver–G
 - `silver` — read `raw_wines`, apply cleaning rules (drop nulls, normalize text, cast rating to `f64`), and write a validated `clean_wines` table with a printed summary of changes
 - `gold` — read `clean_wines`, filter by `--min-rating` (default 90), compute top grape varieties by average rating, and export results to `gold_wines.csv` and `gold_wines.json`
 - `report` — print a Markdown summary table of gold-layer aggregates to stdout
+- `serve` — answer HTTP requests from the gold layer (Module 4; see [the project spec](./docs/module-4/project-serve.md))
 
 A starter implementation is in [wine-pipeline/](./wine-pipeline/).
 
 ```bash
 # Build
 cargo build -p wine-pipeline
+
+# Download the dataset (13.5 MB, not stored in this repository)
+curl -L -o wine-ratings.csv https://raw.githubusercontent.com/paiml/wine-ratings/main/wine-ratings.csv
 
 # Ingest raw CSV
 cargo run -p wine-pipeline -- bronze --input wine-ratings.csv
@@ -105,6 +129,9 @@ cargo run -p wine-pipeline -- gold --min-rating 92
 
 # Print a Markdown report
 cargo run -p wine-pipeline -- report
+
+# Serve the gold layer over HTTP
+cargo run -p wine-pipeline -- serve --min-rating 90 --port 3000
 ```
 
 ## Local Setup

@@ -10,7 +10,10 @@ use rusqlite::Connection;
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(name = "gold", about = "Apply business logic and export gold-layer results")]
+#[command(
+    name = "gold",
+    about = "Apply business logic and export gold-layer results"
+)]
 struct Cli {
     /// Minimum rating threshold (inclusive)
     #[arg(long, default_value_t = 90.0)]
@@ -22,14 +25,12 @@ struct Cli {
 }
 
 fn load_clean(conn: &Connection) -> Result<DataFrame> {
-    let mut stmt = conn.prepare(
-        "SELECT name, variety, region, rating FROM clean_wines",
-    )?;
+    let mut stmt = conn.prepare("SELECT name, variety, region, rating FROM clean_wines")?;
 
-    let mut names:   Vec<String>        = vec![];
-    let mut variety: Vec<String>        = vec![];
-    let mut regions: Vec<Option<String>>= vec![];
-    let mut ratings: Vec<f64>           = vec![];
+    let mut names: Vec<String> = vec![];
+    let mut variety: Vec<String> = vec![];
+    let mut regions: Vec<Option<String>> = vec![];
+    let mut ratings: Vec<f64> = vec![];
 
     let rows = stmt.query_map([], |row| {
         Ok((
@@ -49,10 +50,10 @@ fn load_clean(conn: &Connection) -> Result<DataFrame> {
     }
 
     Ok(DataFrame::new(vec![
-        Series::new("name".into(),    names),
-        Series::new("variety".into(), variety),
-        Series::new("region".into(),  regions),
-        Series::new("rating".into(),  ratings),
+        Column::new("name".into(), names),
+        Column::new("variety".into(), variety),
+        Column::new("region".into(), regions),
+        Column::new("rating".into(), ratings),
     ])?)
 }
 
@@ -72,13 +73,17 @@ fn main() -> Result<()> {
     // --- Top-10 varieties by average rating ---
     println!("\n=== Top varieties by avg rating ===");
     let top_varieties = filtered
+        .clone()
         .lazy()
         .group_by([col("variety")])
         .agg([
             col("rating").mean().alias("avg_rating"),
             col("rating").count().alias("count"),
         ])
-        .sort(["avg_rating"], SortMultipleOptions::default().with_order_descending(true))
+        .sort(
+            ["avg_rating"],
+            SortMultipleOptions::default().with_order_descending(true),
+        )
         .limit(10)
         .collect()?;
     println!("{}", top_varieties);
@@ -86,10 +91,14 @@ fn main() -> Result<()> {
     // --- Highest-rated regions ---
     println!("\n=== Highest-rated regions ===");
     let top_regions = filtered
+        .clone()
         .lazy()
         .group_by([col("region")])
         .agg([col("rating").mean().alias("avg_rating")])
-        .sort(["avg_rating"], SortMultipleOptions::default().with_order_descending(true))
+        .sort(
+            ["avg_rating"],
+            SortMultipleOptions::default().with_order_descending(true),
+        )
         .collect()?;
     println!("{}", top_regions);
 
