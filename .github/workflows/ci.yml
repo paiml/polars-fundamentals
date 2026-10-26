@@ -2,7 +2,8 @@
 #
 # Every example and the wine-pipeline must build, pass clippy, and pass their
 # tests, including the `serve` route tests Module 4's graded project grades
-# against. Runs on the intel clean-room fleet: this org uses no hosted runners.
+# against. All jobs run on GitHub-hosted ubuntu-24.04 with a pinned toolchain
+# (rust-toolchain.toml). `gate` needs every other job.
 name: CI
 
 on:
@@ -11,19 +12,62 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  gate:
-    name: gate
+  build:
+    name: build
     timeout-minutes: 60
-    runs-on: [self-hosted, clean-room, X64, intel]
-    env:
-      CARGO_TERM_COLOR: always
-      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+      - name: Install system packages (README, Linux)
+        run: sudo apt-get update && sudo apt-get install -y build-essential curl
+      - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
+        with:
+          components: rustfmt, clippy
+      - uses: actions/cache@v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: build-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: build-${{ runner.os }}-
       - name: Format
         run: cargo fmt --all -- --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
         run: cargo test --workspace
+
+  pv:
+    name: pv lint
+    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
+      - uses: actions/cache@v6.1.0
+        with:
+          path: ~/.cargo/bin
+          key: tools-pv-0.71.4-${{ runner.os }}
+      - name: Install pv
+        run: command -v pv || cargo install --locked aprender-contracts-cli --version 0.71.4
+      - name: pv lint
+        run: pv lint
+
+  gate:
+    name: gate
+    runs-on: ubuntu-24.04
+    if: ${{ always() }}
+    needs: [build, pv]
+    steps:
+      - name: All jobs must succeed
+        run: |
+          test "${{ needs.build.result }}" = success
+          test "${{ needs.pv.result }}" = success

@@ -1,5 +1,7 @@
 # Polars Fundamentals: Data Engineering with Rust
 
+[![CI](https://github.com/paiml/polars-fundamentals/actions/workflows/ci.yml/badge.svg)](https://github.com/paiml/polars-fundamentals/actions/workflows/ci.yml)
+
 This repository contains hands-on examples and labs for using Polars with Rust for data engineering tasks. A Coursera course from Pragmatic AI Labs.
 
 ## Contents
@@ -136,9 +138,18 @@ cargo run -p wine-pipeline -- serve --min-rating 90 --port 3000
 
 ## Local Setup
 
-1. Install the Rust toolchain:
+1. Install the Rust toolchain and a C compiler (the bundled SQLite in the labs compiles C code). The toolchain version is pinned by `rust-toolchain.toml`.
+
+   **Linux (Ubuntu)**
    ```bash
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   sudo apt-get update && sudo apt-get install -y build-essential curl
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+   ```
+
+   **macOS**
+   ```bash
+   xcode-select --install
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
    ```
 
 2. Clone this repository:
