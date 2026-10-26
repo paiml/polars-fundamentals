@@ -61,13 +61,40 @@ jobs:
       - name: pv lint
         run: pv lint
 
+  coverage-report:
+    name: coverage (report only)
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install system packages (README, Linux)
+        run: sudo apt-get update && sudo apt-get install -y build-essential curl
+      - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
+        with:
+          components: llvm-tools-preview
+      - uses: actions/cache@v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: coverage-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - uses: taiki-e/install-action@v2.87.32
+        with:
+          tool: cargo-llvm-cov@0.8.5
+      # Report mode: prints the line coverage and passes. Measured 52.37%
+      # (below 100%), so it does not enforce a threshold yet.
+      - name: Coverage (report only)
+        run: cargo llvm-cov --workspace --summary-only
+
   gate:
     name: gate
     runs-on: ubuntu-24.04
     if: ${{ always() }}
-    needs: [build, pv]
+    needs: [build, pv, coverage-report]
     steps:
       - name: All jobs must succeed
         run: |
           test "${{ needs.build.result }}" = success
           test "${{ needs.pv.result }}" = success
+          test "${{ needs.coverage-report.result }}" = success
