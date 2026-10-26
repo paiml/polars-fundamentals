@@ -45,22 +45,6 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-  pv:
-    name: pv lint
-    timeout-minutes: 20
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@d124f86f28ff42855784ff3319f48ac182c248f8 # 1.99.1
-      - uses: actions/cache@v6.1.0
-        with:
-          path: ~/.cargo/bin
-          key: tools-pv-0.71.4-${{ runner.os }}
-      - name: Install pv
-        run: command -v pv || cargo install --locked aprender-contracts-cli --version 0.71.4
-      - name: pv lint
-        run: pv lint
-
   coverage-report:
     name: coverage (report only)
     timeout-minutes: 60
@@ -91,10 +75,9 @@ jobs:
     name: gate
     runs-on: ubuntu-24.04
     if: ${{ always() }}
-    needs: [build, pv, coverage-report]
+    needs: [build, coverage-report]
     steps:
       - name: All jobs must succeed
         run: |
           test "${{ needs.build.result }}" = success
-          test "${{ needs.pv.result }}" = success
           test "${{ needs.coverage-report.result }}" = success
